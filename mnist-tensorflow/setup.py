@@ -1,0 +1,23 @@
+from codecs import open
+
+from setuptools import setup
+
+with open('README.md', encoding='utf-8') as f:
+    readme = f.read()
+
+with open('requirements.txt', encoding='utf-8') as f:
+    requirements = [line.strip() for line in f]
+
+setup(
+    name='soccer_topic_relations_generator',
+    version='0.0.1',
+
+    description='Python package containing code relating to the Context Engine.',
+    long_description=readme,
+    install_requires=requirements,
+
+    author=['Alexander Hentschel'],
+    author_email=['alex.hentschel@axiomzen.co'],
+
+    packages=['soccer_topic_relations_generator','topics_util'],
+)
