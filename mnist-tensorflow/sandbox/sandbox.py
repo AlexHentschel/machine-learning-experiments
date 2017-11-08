@@ -11,11 +11,9 @@ Author: Aymeric Damien
 Project: https://github.com/aymericdamien/TensorFlow-Examples/
 
 ------------------------------------------------------------------------------
-In compliance with License conditions, most of the code in this file originates from
+In compliance with License conditions, the code in this file was inspired
+by Aymeric Damien's multilayer_perceptron.py:
 https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/3_NeuralNetworks/multilayer_perceptron.py
-by Aymeric Damien
-
-It has been modified and extended
 
 Author: Alexander Hentschel
         alex.hentschel@axiomzen.co

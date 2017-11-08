@@ -9,15 +9,15 @@ with open('requirements.txt', encoding='utf-8') as f:
     requirements = [line.strip() for line in f]
 
 setup(
-    name='soccer_topic_relations_generator',
+    name='mnist_tensorflow',
     version='0.0.1',
 
-    description='Python package containing code relating to the Context Engine.',
+    description='Tensorflow Neural Network for solving MNIST',
     long_description=readme,
     install_requires=requirements,
 
     author=['Alexander Hentschel'],
     author_email=['alex.hentschel@axiomzen.co'],
 
-    packages=['soccer_topic_relations_generator','topics_util'],
+    packages=['neural_network_model','utils'],
 )

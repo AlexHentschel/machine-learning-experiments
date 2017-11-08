@@ -14,7 +14,7 @@ Useful References:
 Notes: 
 - Tested on Anaconda 5.0.1 x64, Python 3.6.2
 
-**Install**
+**Install TensorFlow**
 1. create new virtual env:
     ```
     $> python -m venv --symlinks --without-pip /Users/alex/Development/PythonVEs/tensorflow
@@ -32,6 +32,16 @@ Notes:
    ```
    $> pip3 install --upgrade tensorflow
    ```
+4. Install other useful dependencies for data science
+   ```
+   $> pip install matplotlib pandas gzip
+   ```
+
+**Install Package**
+Install package in developer mode (switch `-e`) 
+```
+$> pip install -e <path to folder containing setup.py>
+```
 
 ## Usage
 

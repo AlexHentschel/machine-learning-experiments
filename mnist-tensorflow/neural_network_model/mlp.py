@@ -1,126 +1,108 @@
-""" Multilayer Perceptron.
-
-A Multilayer Perceptron (Neural Network) implementation example using
-TensorFlow library. This example is using the MNIST database of handwritten
-digits (http://yann.lecun.com/exdb/mnist/).
-
-Links:
-    [MNIST Dataset](http://yann.lecun.com/exdb/mnist/).
-
-Author: Aymeric Damien
-Project: https://github.com/aymericdamien/TensorFlow-Examples/
+"""
+Multi-Layer Perceptron (MLP).
+A Neural Network, specifically MLP, implementation based on TensorFlow.
 
 ------------------------------------------------------------------------------
-In compliance with License conditions, most of the code in this file originates from
+In compliance with License conditions, the code in this file was inspired
+by Aymeric Damien's multilayer_perceptron.py:
 https://github.com/aymericdamien/TensorFlow-Examples/blob/master/examples/3_NeuralNetworks/multilayer_perceptron.py
-by Aymeric Damien
 
-It has been modified and extended
+Copyright (c)
+* 2015, Aymeric Damien.
+* 2017, Alexander Hentschel, alex.hentschel@axiomzen.co
 
-Author: Alexander Hentschel
-        alex.hentschel@axiomzen.co
-
-see also:
+For further explanation, see:
 https://gist.github.com/mick001/45a45b94eab29d81a5f1e46d88632053
 http://www.jessicayung.com/explaining-tensorflow-code-for-a-multilayer-perceptron/
+------------------------------------------------------------------------------
 """
-
-
-#
-# ------------------------------------------------------------------------------
 
 from __future__ import print_function
 from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 import os
 import numpy as np
+import logging
 
 
-tf.set_random_seed(1234)
+class mnist_mlp(object):
+    """
+    TensorFlow based implementation for 3-Layer neural network for solving MNIST.
+    Please do NOT use MULTIPLE INSTANCES within the same python kernel.
 
-import pickle
+    """
+
+    def __init__(self, seed=None):
+        self._seed = seed
+        self.logger = logging.getLogger("mnist-mlp")
+        #
+        # Create TensorFlow compute graph with network parameters
+        n_input = 784 # MNIST data input (img shape: 28*28)
+        n_hidden_1 = 256 # 1st layer number of neurons
+        n_hidden_2 = 256 # 2nd layer number of neurons
+        n_classes = 10 # MNIST total classes (0-9 digits)
+        #
+        # tf Graph input and output
+        self._X = tf.placeholder("float", [None, n_input])
+        self._Y = tf.placeholder("float", [None, n_classes])
+        #
+        # Store layers' weights & biases
+        self._params = {
+            'layer1_weights': tf.Variable(tf.random_normal([n_input, n_hidden_1])),
+            'layer2_weights': tf.Variable(tf.random_normal([n_hidden_1, n_hidden_2])),
+            'output_weights': tf.Variable(tf.random_normal([n_hidden_2, n_classes])),
+            'layer1_bias': tf.Variable(tf.random_normal([n_hidden_1])),
+            'layer2_bias': tf.Variable(tf.random_normal([n_hidden_2])),
+            'output_bias': tf.Variable(tf.random_normal([n_classes]))
+        }
+        #
+        # define neural network
+        layer_1 = tf.add(tf.matmul(self._X, self._params['layer1_weights']), self._params['layer1_bias'])
+        layer_1 = tf.nn.tanh(layer_1)
+        # Hidden fully connected layer with 256 neurons
+        layer_2 = tf.add(tf.matmul(layer_1, self._params['layer2_weights']), self._params['layer2_bias'])
+        layer_2 = tf.nn.tanh(layer_2)
+        # Output fully connected layer with a neuron for each class
+        logits_output = tf.add(tf.matmul(layer_2, self._params['output_weights']), self._params['output_bias'])
+        #
+        # Define loss function:
+        # currently cross-entropy loss, we should probably replace that with the
+        # smooth-hinge loss function to be consistent.
+        self._loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits_output, labels=self._Y))
+        #
+        self._gradients = {key : tf.gradients(self._loss, [var])[0] for key, var in self._params.items() }
+        #
+        self._session_started = False
 
 
-# IMPORT DATA
-# =======================================================================================
-# * input data: mnist.train.images
-#   Tensor (an n-dimensional array) with a shape of [55000, 784].
-#   The first dimension is an index into the list of images and the second dimension is
-#   the index for each pixel in each image. Each entry in the tensor is a pixel intensity
-#   between 0 and 1, for a particular pixel in a particular image.
-# output data: mnist.train.labels
-# * Lables indicating number (0 ... 9) in one-hot encoding
-
-working_dir = "/Users/alex/Temp/MNIST"
-data_dir = "MNIST_data"
-
-abs_data_dir = os.path.abspath(os.path.join(working_dir, data_dir))
-print("Storing temporary MNIST data in '%s'" % abs_data_dir)
-if not os.path.exists(abs_data_dir):
-    os.makedirs(abs_data_dir)
-mnist = input_data.read_data_sets(abs_data_dir, one_hot=True)
+    def start(self):
+        if not self._session_started:
+            if self._seed:
+                tf.set_random_seed(self._seed)
+            self._session = tf.InteractiveSession()
+            tf.global_variables_initializer().run()
+            self._session_started = True
 
 
-# Parameters
-learning_rate = 0.001
-training_epochs = 5
-batch_size = 100
-display_step = 1
+    def close(self):
+        if self._session_started:
+            self._session.close()
+            self._session_started = False
 
-# Network Parameters
-n_input = 784 # MNIST data input (img shape: 28*28)
-n_hidden_1 = 256 # 1st layer number of neurons
-n_hidden_2 = 256 # 2nd layer number of neurons
-n_classes = 10 # MNIST total classes (0-9 digits)
+    def get_network_parameters(self):
+        if not self._session_started:
+            raise ValueError("Please start TensorFlow session by calling function 'start'")
+        return {key : self._session.run(var) for key, var in self._params.items() }
 
-# tf Graph input
-X = tf.placeholder("float", [None, n_input])
-Y = tf.placeholder("float", [None, n_classes])
+    def compute_gradient(self, x, y):
+        if not self._session_started:
+            raise ValueError("Please start TensorFlow session by calling function 'start'")
+        loss, c = sess.run([self._loss, loss_op], feed_dict={X: batch_x,
+                                                        Y: batch_y})
 
-# Store layers weight & bias
-weights = {
-    'h1': tf.Variable(tf.random_normal([n_input, n_hidden_1])),
-    'h2': tf.Variable(tf.random_normal([n_hidden_1, n_hidden_2])),
-    'out': tf.Variable(tf.random_normal([n_hidden_2, n_classes]))
-}
-biases = {
-    'b1': tf.Variable(tf.random_normal([n_hidden_1])),
-    'b2': tf.Variable(tf.random_normal([n_hidden_2])),
-    'out': tf.Variable(tf.random_normal([n_classes]))
-}
+        return {key : self._session.run(var) for key, var in self._gradients.items() }
 
-# http://deeplearning.net/tutorial/mlp.html
-# rng.uniform(
-#     low=-numpy.sqrt(6. / (n_in + n_out)),
-#     high=numpy.sqrt(6. / (n_in + n_out)),
-#     size=(n_in, n_out)
-# ),
-
-# MISSING: non-linear activation function
-#  * tf.nn.tanh()
-#  * tf.nn.relu(...)
-#  * alternatively, use tf.layers.dense()
-
-# Create model
-def multilayer_perceptron(x):
-    # Hidden fully connected layer with 256 neurons
-    layer_1 = tf.add(tf.matmul(x, weights['h1']), biases['b1'])
-    layer_1 = tf.nn.tanh(layer_1)
-    # Hidden fully connected layer with 256 neurons
-    layer_2 = tf.add(tf.matmul(layer_1, weights['h2']), biases['b2'])
-    layer_2 = tf.nn.tanh(layer_2)
-    # Output fully connected layer with a neuron for each class
-    out_layer = tf.matmul(layer_2, weights['out']) + biases['out']
-    out_layer = tf.nn.tanh(out_layer)
-    return out_layer
-
-# Construct model
-logits = multilayer_perceptron(X)
-
-# Define loss and optimizer
-loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-train_op = optimizer.minimize(loss_op)
+    def
 
 
 # support methods
@@ -311,3 +293,7 @@ print("Tensor difference between current weight '%s' and loaded matrix: %.9f" % 
 
 
 
+llevel = logging.DEBUG
+logging.basicConfig(stream=sys.stdout, level=llevel)
+logger = logging.getLogger("protoype")
+logger.setLevel(llevel)
