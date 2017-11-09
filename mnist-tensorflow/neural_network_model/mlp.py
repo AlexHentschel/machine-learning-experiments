@@ -23,6 +23,7 @@ import tensorflow as tf
 import os
 import numpy as np
 import logging
+import sys
 
 
 class mnist_mlp(object):
@@ -32,268 +33,143 @@ class mnist_mlp(object):
 
     """
 
-    def __init__(self, seed=None):
-        self._seed = seed
+    def __init__(self):
         self.logger = logging.getLogger("mnist-mlp")
         #
         # Create TensorFlow compute graph with network parameters
-        n_input = 784 # MNIST data input (img shape: 28*28)
-        n_hidden_1 = 256 # 1st layer number of neurons
-        n_hidden_2 = 256 # 2nd layer number of neurons
-        n_classes = 10 # MNIST total classes (0-9 digits)
+        self._n_input = 784 # MNIST data input (img shape: 28*28)
+        self._n_hidden_1 = 256 # 1st layer number of neurons
+        self._n_hidden_2 = 256 # 2nd layer number of neurons
+        self._n_classes = 10 # MNIST total classes (0-9 digits)
         #
         # tf Graph input and output
-        self._X = tf.placeholder("float", [None, n_input])
-        self._Y = tf.placeholder("float", [None, n_classes])
+        self._input_data = tf.placeholder("float", [None, self._n_input])
+        self._output_labels = tf.placeholder("float", [None, self._n_classes])
         #
         # Store layers' weights & biases
         self._params = {
-            'layer1_weights': tf.Variable(tf.random_normal([n_input, n_hidden_1])),
-            'layer2_weights': tf.Variable(tf.random_normal([n_hidden_1, n_hidden_2])),
-            'output_weights': tf.Variable(tf.random_normal([n_hidden_2, n_classes])),
-            'layer1_bias': tf.Variable(tf.random_normal([n_hidden_1])),
-            'layer2_bias': tf.Variable(tf.random_normal([n_hidden_2])),
-            'output_bias': tf.Variable(tf.random_normal([n_classes]))
+            'layer1 weights': tf.placeholder("float", [self._n_input, self._n_hidden_1]),
+            'layer2 weights': tf.placeholder("float", [self._n_hidden_1, self._n_hidden_2]),
+            'output layer weights': tf.placeholder("float", [self._n_hidden_2, self._n_classes]),
+            'layer1 bias': tf.placeholder("float", [self._n_hidden_1]),
+            'layer2 bias': tf.placeholder("float", [self._n_hidden_2]),
+            'output layer bias': tf.placeholder("float", [self._n_classes])
         }
         #
         # define neural network
-        layer_1 = tf.add(tf.matmul(self._X, self._params['layer1_weights']), self._params['layer1_bias'])
+        layer_1 = tf.add(tf.matmul(self._input_data, self._params['layer1 weights']), self._params['layer1 bias'])
         layer_1 = tf.nn.tanh(layer_1)
         # Hidden fully connected layer with 256 neurons
-        layer_2 = tf.add(tf.matmul(layer_1, self._params['layer2_weights']), self._params['layer2_bias'])
+        layer_2 = tf.add(tf.matmul(layer_1, self._params['layer2 weights']), self._params['layer2 bias'])
         layer_2 = tf.nn.tanh(layer_2)
         # Output fully connected layer with a neuron for each class
-        logits_output = tf.add(tf.matmul(layer_2, self._params['output_weights']), self._params['output_bias'])
+        logits_output = tf.add(tf.matmul(layer_2, self._params['output layer weights']), self._params['output layer bias'])
         #
         # Define loss function:
         # currently cross-entropy loss, we should probably replace that with the
         # smooth-hinge loss function to be consistent.
-        self._loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits_output, labels=self._Y))
+        self._loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits_output, labels=self._output_labels))
         #
-        self._gradients = {key : tf.gradients(self._loss, [var])[0] for key, var in self._params.items() }
+        self._param_keys = list(self._params.keys())
+        self._param_variables = [self._params[k] for k in self._param_keys]
+        self._param_gradients = tf.gradients(self._loss, self._param_variables)
         #
-        self._session_started = False
-
+        # self._gradients = {k : tf.gradients(self._loss, [var])[0] for k, var in self._params.items() }
+        #
+        self._session = None
 
     def start(self):
-        if not self._session_started:
-            if self._seed:
-                tf.set_random_seed(self._seed)
-            self._session = tf.InteractiveSession()
-            tf.global_variables_initializer().run()
-            self._session_started = True
-
+        if self._session is not None:
+            raise ValueError("TensorFlow session already started")
+        self._session = tf.InteractiveSession()
+        # tf.global_variables_initializer().run()
+        uninit_vars = self._session.run(tf.report_uninitialized_variables())
+        if len(uninit_vars) > 0: # Note: we shouldn't need to initialize as values for all variables are fed in externally
+            raise ValueError("Uninitialized variables in TensorFlow session")
+        print(uninit_vars)
 
     def close(self):
-        if self._session_started:
+        if self._session is not None:
             self._session.close()
-            self._session_started = False
+            self._session = None
 
-    def get_network_parameters(self):
-        if not self._session_started:
-            raise ValueError("Please start TensorFlow session by calling function 'start'")
-        return {key : self._session.run(var) for key, var in self._params.items() }
+    def _ensure_session_stated(self):
+        if self._session is None:
+            raise ValueError("Please start TensorFlow session by calling function 'start()'")
 
-    def compute_gradient(self, x, y):
-        if not self._session_started:
-            raise ValueError("Please start TensorFlow session by calling function 'start'")
-        loss, c = sess.run([self._loss, loss_op], feed_dict={X: batch_x,
-                                                        Y: batch_y})
-
-        return {key : self._session.run(var) for key, var in self._gradients.items() }
-
-    def
-
-
-# support methods
-# =======================================================================================
-
-def save_dataset(tf_sess, tf_vars, working_dir, target_file):
-    values = {key: tf_sess.run(var) for key, var in tf_vars.items()}
-    target = os.path.abspath(os.path.join(working_dir, target_file))
-    target_dir = os.path.abspath(os.path.join(target, os.pardir))
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-    np.savez_compressed(target, **values)
-
-def save_nn_params(tf_sess, id, weight_vars, bias_vars, working_dir):
-    save_dataset(tf_sess, weight_vars, working_dir, "weights_" + str(id) + ".npz")
-    save_dataset(tf_sess, bias_vars, working_dir, "biases_" + str(id) + ".npz")
-
-
-# Self-contained session
-# =======================================================================================
-temp_dir = "temp2"
-
-# Initializing the variables
-init = tf.global_variables_initializer()
-
-with tf.Session() as sess:
-    sess.run(init)
-
-    # Training cycle
-    for epoch in range(training_epochs):
-        avg_cost = 0.
-        total_batch = int(mnist.train.num_examples/batch_size)
-        # Loop over all batches
-        for i in range(total_batch):
-            batch_x, batch_y = mnist.train.next_batch(batch_size)
-            # Run optimization op (backprop) and cost op (to get loss value)
-            _, c = sess.run([train_op, loss_op], feed_dict={X: batch_x,
-                                                            Y: batch_y})
-            # Compute average loss
-            avg_cost += c / total_batch
-        # Display logs per epoch step
-        if epoch % display_step == 0:
-            print("Epoch:", '%04d' % (epoch+1), "cost={:.9f}".format(avg_cost))
+    def compute_gradient(self, x, y, ws):
+        self._ensure_session_stated()
         #
-        target_dir = os.path.join(working_dir, temp_dir)
-        save_nn_params(sess, '%04d' % epoch, weights, biases, target_dir)
-        np.savez_compressed(os.path.join(target_dir, "data_batch_%04d.npz" % epoch), batch_x=batch_x, batch_y=batch_y)
+        feed_dict = dict(ws)                  # copy dictionary to prevent modification of function input
+        feed_dict[self._input_data] = x       # add user-specified value for input data batch
+        feed_dict[self._output_labels] = y    # add user-specified value for target labels
+        loss, gradients_list = self._session.run([self._loss, self._param_gradients], feed_dict=feed_dict)
+        return loss, dict(zip(self._param_variables, gradients_list))
 
-    print("Optimization Finished!")
+    def generate_initial_network_parameters(self, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        return { v: np.random.normal(size=v.shape.as_list()) for v in self._params.values() }
 
-    # Test model
-    pred = tf.nn.softmax(logits)  # Apply softmax to logits
-    correct_prediction = tf.equal(tf.argmax(pred, 1), tf.argmax(Y, 1))
-    # Calculate accuracy
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-    print("Accuracy:", accuracy.eval({X: mnist.test.images, Y: mnist.test.labels}))
+    def to_clearnames(self, parameter_dictionary):
+        var_to_clearname_dic = { v:k for k,v in self._params.items() }
+        var_to_clearname_dic[self._input_data] = 'input data batch'
+        var_to_clearname_dic[self._output_labels] = 'target label batch'
+        return { var_to_clearname_dic[k] : v for k, v in parameter_dictionary.items() }
 
-
-
-
-
-
-
-
-
-# Self-contained session
-# =======================================================================================
-
-# Initializing the variables
-init = tf.global_variables_initializer()
-
-with tf.Session() as sess:
-    sess.run(init)
-
-    # Training cycle
-    for epoch in range(training_epochs):
-        avg_cost = 0.
-        total_batch = int(mnist.train.num_examples/batch_size)
-        # Loop over all batches
-        for i in range(total_batch):
-            batch_x, batch_y = mnist.train.next_batch(batch_size)
-            # Run optimization op (backprop) and cost op (to get loss value)
-            _, c = sess.run([train_op, loss_op], feed_dict={X: batch_x,
-                                                            Y: batch_y})
-            # Compute average loss
-            avg_cost += c / total_batch
-        # Display logs per epoch step
-        if epoch % display_step == 0:
-            print("Epoch:", '%04d' % (epoch+1), "cost={:.9f}".format(avg_cost))
-    print("Optimization Finished!")
-
-    # Test model
-    pred = tf.nn.softmax(logits)  # Apply softmax to logits
-    correct_prediction = tf.equal(tf.argmax(pred, 1), tf.argmax(Y, 1))
-    # Calculate accuracy
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-    print("Accuracy:", accuracy.eval({X: mnist.test.images, Y: mnist.test.labels}))
+    def to_intervars(self, parameter_dictionary):
+        return {self._params[k] :parameter_dictionary[k]  for k in self._param_keys}
 
 
+# ============================= Main for testing ==============================
 
 
-# Interactive session
-# =======================================================================================
+def save_dataset(values, target_file):
+    values = {key.replace(' ', '_') : var for key, var in values.items()}
+    target_dir = os.path.abspath(os.path.join(target_file, os.pardir))
+    if not os.path.exists(target_dir):
+        print("creating folder")
+        os.makedirs(target_dir)
+    target_file = os.path.abspath(target_file)
+    print("writing file '%s'" % target_file)
+    np.savez_compressed(target_file, **values)
 
-tf.set_random_seed(1234)
-
-sess = tf.InteractiveSession()
-tf.global_variables_initializer().run()
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-temp_dir = "temp1"
-
-id = '%03d' % 0
-save_nn_params(sess, "x", weights, biases, os.path.join(working_dir, temp_dir))
-
-loaded = np.load(os.path.join(os.path.join(working_dir, "temp1"), "weights_x.npz"))
-loaded.keys()
-
-ref_values = np.load(os.path.join(os.path.join(working_dir, "temp"), "weights_000.npz"))
-
-for key in ref_values.keys():
-    abs_error = np.sum(np.absolute(loaded[key] - ref_values[key]))
-    print("Abs Error for matrix '%s': %f" % (key,abs_error))
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-sess.close()
-
-# get weights:
-# https://stackoverflow.com/questions/33679382/tensorflow-get-current-value-of-a-variable
-#
-
-# Tensorflow get gradient
-# https://stackoverflow.com/questions/35226428/how-do-i-get-the-gradient-of-the-loss-at-a-tensorflow-variable
-
-# assign weights
-# https://github.com/tensorflow/tensorflow/issues/2854
-
-
-
-loaded = np.load(os.path.join(os.path.join(working_dir, "temp"), "weights_1.npz"))
-loaded.keys()
-
-ref_values = np.load(os.path.join(os.path.join(working_dir, "temp"), "biases_3.npz"))
-
-for key in ref_values.keys():
-    abs_error = np.sum(np.absolute(loaded[key] - ref_values[key]))
-    print("Abs Error for matrix '%s': %f" % (key,abs_error))
-
-# =======================================================================================
-
-sess = tf.InteractiveSession()
-tf.global_variables_initializer().run()
-
-temp_dir = "temp"
-for i in np.arange(0,5):
-    weight_values = np.load(os.path.join(os.path.join(working_dir, temp_dir), "weights_" + str(i) + ".npz"))
-    biases_values = np.load(os.path.join(os.path.join(working_dir, temp_dir), "biases_" + str(i) + ".npz"))
-    data = np.load(os.path.join(os.path.join(working_dir, temp_dir), "data_batch_%04d.npz" % i))
-    for k,v in weight_values.items():
-        sess.run(tf.assign(weights[k], v))
-    for k,v in biases_values.items():
-        sess.run(tf.assign(biases[k], v))
-    _, c = sess.run([train_op, loss_op], feed_dict={X: data["batch_x"], Y: data["batch_y"]})
-    print("Cost for batch %d: %.9f" %(i,c))
-
-
-
-
-sess.close()
-
-k = 'h1'
-loaded = np.load(os.path.join(os.path.join(working_dir, "temp"), "weights_1.npz"))
-
-# difference between randomly initialized value and loaded weights
-t = sess.run(weights[k]).copy()
-er = np.sum(np.absolute(loaded[k] - t))
-print("Tensor difference between current weight '%s' and loaded matrix: %.9f" % (k, er))
-
-# override with loaded weights: assign loaded weights
-assign_op = tf.assign(weights[k], loaded[k])
-sess.run(assign_op)
-t = sess.run(weights[k]).copy()
-er = np.sum(np.absolute(loaded[k] - t))
-print("Tensor difference between current weight '%s' and loaded matrix: %.9f" % (k, er))
-
-
+if __name__ == "__main__":
+    llevel = logging.DEBUG
+    logging.basicConfig(stream=sys.stdout, level=llevel)
+    logger = logging.getLogger("protoype")
+    logger.setLevel(llevel)
 
 
 llevel = logging.DEBUG
 logging.basicConfig(stream=sys.stdout, level=llevel)
 logger = logging.getLogger("protoype")
 logger.setLevel(llevel)
+
+T = mnist_mlp()
+params = T.generate_initial_network_parameters(seed=1234)
+ipc = T.to_clearnames(params)
+
+# save starting parameters
+working_dir = "/Users/alex/Temp/MNIST"
+param_dir = "params"
+iteration = 0
+file_name = "params_%04d.npz" % iteration
+
+target_file = os.path.abspath(os.path.join(working_dir, param_dir, "params_%04d.npz" % iteration))
+save_dataset(ipc, target_file)
+
+
+learning_rate = 0.5
+T.start()
+for iteration in np.arange(5):
+    data = np.load(os.path.join(os.path.join(working_dir, "batches"), "data_batch_%04d.npz" % iteration))
+    l, grad = T.compute_gradient(data['batch_x'], data['batch_y'], params)
+    for k in params.keys():
+        params[k] -= learning_rate * grad[k]
+    print("loss %.09f" % l)
+    target_file = os.path.abspath(os.path.join(working_dir, param_dir, "params_%04d.npz" % (iteration+1)))
+    save_dataset(T.to_clearnames(params), target_file)
+
+T.close()
+

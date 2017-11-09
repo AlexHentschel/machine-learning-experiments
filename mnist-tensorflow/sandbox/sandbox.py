@@ -34,7 +34,7 @@ import os
 import numpy as np
 
 
-tf.set_random_seed(1234)
+# tf.set_random_seed(1234)
 
 import pickle
 
