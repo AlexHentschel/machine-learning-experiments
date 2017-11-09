@@ -19,5 +19,5 @@ setup(
     author=['Alexander Hentschel'],
     author_email=['alex.hentschel@axiomzen.co'],
 
-    packages=['neural_network_model','utils'],
+    packages=['neural_network_model'],
 )
