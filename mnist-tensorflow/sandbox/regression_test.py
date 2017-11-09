@@ -32,11 +32,13 @@ from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 import os
 import numpy as np
-
-
-# tf.set_random_seed(1234)
-
 import pickle
+
+from neural_network_model.mlp import mnist_mlp
+
+tf.set_random_seed(1234)
+
+
 
 
 # IMPORT DATA
@@ -49,75 +51,64 @@ import pickle
 # output data: mnist.train.labels
 # * Lables indicating number (0 ... 9) in one-hot encoding
 
-working_dir = "/Users/alex/Temp/MNIST"
-data_dir = "MNIST_data"
 
-abs_data_dir = os.path.abspath(os.path.join(working_dir, data_dir))
-print("Storing temporary MNIST data in '%s'" % abs_data_dir)
-if not os.path.exists(abs_data_dir):
-    os.makedirs(abs_data_dir)
-mnist = input_data.read_data_sets(abs_data_dir, one_hot=True)
+def import_data(working_dir, data_dir):
+    abs_data_dir = os.path.abspath(os.path.join(working_dir, data_dir))
+    print("Storing temporary MNIST data in '%s'" % abs_data_dir)
+    if not os.path.exists(abs_data_dir):
+        os.makedirs(abs_data_dir)
+    mnist = input_data.read_data_sets(abs_data_dir, one_hot=True)
+    return mnist
 
+def construct_nn():
+    # Parameters
+    learning_rate = 0.001
+    training_epochs = 5
+    batch_size = 100
+    display_step = 1
 
-# Parameters
-learning_rate = 0.001
-training_epochs = 5
-batch_size = 100
-display_step = 1
+    # Network Parameters
+    n_input = 784 # MNIST data input (img shape: 28*28)
+    n_hidden_1 = 256 # 1st layer number of neurons
+    n_hidden_2 = 256 # 2nd layer number of neurons
+    n_classes = 10 # MNIST total classes (0-9 digits)
 
-# Network Parameters
-n_input = 784 # MNIST data input (img shape: 28*28)
-n_hidden_1 = 256 # 1st layer number of neurons
-n_hidden_2 = 256 # 2nd layer number of neurons
-n_classes = 10 # MNIST total classes (0-9 digits)
+    # tf Graph input
+    X = tf.placeholder("float", [None, n_input])
+    Y = tf.placeholder("float", [None, n_classes])
 
-# tf Graph input
-X = tf.placeholder("float", [None, n_input])
-Y = tf.placeholder("float", [None, n_classes])
+    # Store layers weight & bias
+    weights = {
+        'h1': tf.Variable(tf.random_normal([n_input, n_hidden_1])),
+        'h2': tf.Variable(tf.random_normal([n_hidden_1, n_hidden_2])),
+        'out': tf.Variable(tf.random_normal([n_hidden_2, n_classes]))
+    }
+    biases = {
+        'b1': tf.Variable(tf.random_normal([n_hidden_1])),
+        'b2': tf.Variable(tf.random_normal([n_hidden_2])),
+        'out': tf.Variable(tf.random_normal([n_classes]))
+    }
 
-# Store layers weight & bias
-weights = {
-    'h1': tf.Variable(tf.random_normal([n_input, n_hidden_1])),
-    'h2': tf.Variable(tf.random_normal([n_hidden_1, n_hidden_2])),
-    'out': tf.Variable(tf.random_normal([n_hidden_2, n_classes]))
-}
-biases = {
-    'b1': tf.Variable(tf.random_normal([n_hidden_1])),
-    'b2': tf.Variable(tf.random_normal([n_hidden_2])),
-    'out': tf.Variable(tf.random_normal([n_classes]))
-}
+    # Create model
+    def multilayer_perceptron(x):
+        # Hidden fully connected layer with 256 neurons
+        layer_1 = tf.add(tf.matmul(x, weights['h1']), biases['b1'])
+        layer_1 = tf.nn.tanh(layer_1)
+        # Hidden fully connected layer with 256 neurons
+        layer_2 = tf.add(tf.matmul(layer_1, weights['h2']), biases['b2'])
+        layer_2 = tf.nn.tanh(layer_2)
+        # Output fully connected layer with a neuron for each class
+        out_layer = tf.matmul(layer_2, weights['out']) + biases['out']
+        return out_layer
 
-# http://deeplearning.net/tutorial/mlp.html
-# rng.uniform(
-#     low=-numpy.sqrt(6. / (n_in + n_out)),
-#     high=numpy.sqrt(6. / (n_in + n_out)),
-#     size=(n_in, n_out)
-# ),
+    # Construct model
+    logits = multilayer_perceptron(X)
 
-# MISSING: non-linear activation function
-#  * tf.nn.tanh()
-#  * tf.nn.relu(...)
-#  * alternatively, use tf.layers.dense()
+    # Define loss and optimizer
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
+    optimizer = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
 
-# Create model
-def multilayer_perceptron(x):
-    # Hidden fully connected layer with 256 neurons
-    layer_1 = tf.add(tf.matmul(x, weights['h1']), biases['b1'])
-    layer_1 = tf.nn.tanh(layer_1)
-    # Hidden fully connected layer with 256 neurons
-    layer_2 = tf.add(tf.matmul(layer_1, weights['h2']), biases['b2'])
-    layer_2 = tf.nn.tanh(layer_2)
-    # Output fully connected layer with a neuron for each class
-    out_layer = tf.matmul(layer_2, weights['out']) + biases['out']
-    return out_layer
-
-# Construct model
-logits = multilayer_perceptron(X)
-
-# Define loss and optimizer
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
-optimizer = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
-
+    return [optimizer, cross_entropy]
 
 
 # =======================================================================================
@@ -141,4 +132,28 @@ for iteration in np.arange(5):
     _, l = sess.run([optimizer, cross_entropy], feed_dict={X: data['batch_x'], Y: data['batch_y']})
     print("loss %.09f" % l)
 
+# =======================================================================================
 
+working_dir = "/Users/alex/Temp/MNIST"
+mnist = import_data(working_dir, "MNIST_data")
+
+batch_x, batch_y = mnist.train.next_batch(batch_size)
+
+T = mnist_mlp()
+params = T.generate_initial_network_parameters(seed=1234)
+
+T.start()
+ipc = T.to_clearnames(params)
+
+learning_rate = 0.5
+
+for iteration in np.arange(5):
+    data = np.load(os.path.join(os.path.join(working_dir, "batches"), "data_batch_%04d.npz" % iteration))
+    l, grad = T.evaluate(data['batch_x'], data['batch_y'], params)
+    for k in params.keys():
+        params[k] -= learning_rate * grad[k]
+    print("loss %.09f" % l)
+    target_file = os.path.abspath(os.path.join(working_dir, param_dir, "params_%04d.npz" % (iteration+1)))
+    save_dataset(T.to_clearnames(params), target_file)
+
+T.close()

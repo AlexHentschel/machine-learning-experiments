@@ -8,7 +8,13 @@ Useful References:
 - 
 [TensorFlow tutorial for MNIST](https://www.tensorflow.org/get_started/mnist/beginners)
 
+## Usage
 
+For usage example, please see `neural_network_model.mlp_usage_example.py`. 
+The main business logic is contained in `neural_network_model.mlp.py`.
+
+Please ignore all files in folder `sandbox` as they are for prototyping. They are not used 
+anywhere.
 
 ## Installation on MacOS 
 Notes: 
@@ -43,12 +49,4 @@ Install package in developer mode (switch `-e`)
 $> pip install -e <path to folder containing setup.py>
 ```
 
-## Usage
-
-
-## Development
-
-## Tests
-
-### Uploading
 

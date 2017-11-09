@@ -1,6 +1,29 @@
 """
-Multi-Layer Perceptron (MLP).
-A Neural Network, specifically MLP, implementation based on TensorFlow.
+Logistic regression model for solving MNIST.
+The model is a Multi-Layer Perceptron (MLP) implemented in TensorFlow.
+
+Model specifics:
+- input layer for 784 features, representing the 28*28 image pixels
+- two hidden layers contain 256 neurons each
+  with tanh activation
+- output layer is the softmax function
+
+Training objective:
+- minimize cross entropy loss
+
+Class only computes:
+- numerical loss value for given data set
+- gradients of the loss function with respect to internal network parameters
+
+Notes:
+- Most likely, several instances of this class can be used within the same Python kernel
+- However, concurrency of multiple instances has not been tested and such uisage is therefore discouraged.
+
+Tested with
+- Anaconda 5.0.1 x64, Python 3.6.2
+- TensorFlow 1.4.0
+- on MacOS High Sierra (10.13.1)
+
 
 ------------------------------------------------------------------------------
 In compliance with License conditions, the code in this file was inspired
@@ -17,13 +40,9 @@ http://www.jessicayung.com/explaining-tensorflow-code-for-a-multilayer-perceptro
 ------------------------------------------------------------------------------
 """
 
-from __future__ import print_function
-from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
-import os
 import numpy as np
 import logging
-import sys
 
 
 class mnist_mlp(object):
@@ -74,11 +93,18 @@ class mnist_mlp(object):
         self._param_variables = [self._params[k] for k in self._param_keys]
         self._param_gradients = tf.gradients(self._loss, self._param_variables)
         #
-        # self._gradients = {k : tf.gradients(self._loss, [var])[0] for k, var in self._params.items() }
+        class_probabilities = tf.nn.softmax(logits_output)
+        correct_prediction = tf.equal(tf.argmax(class_probabilities, 1), tf.argmax(self._output_labels, 1))
+        self._accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         #
         self._session = None
 
     def start(self):
+        """
+        Starts up the internal TensorFlow session,
+        which required to compute anything. Please close the
+        session at the end by calling mlp.close()
+        """
         if self._session is not None:
             raise ValueError("TensorFlow session already started")
         self._session = tf.InteractiveSession()
@@ -86,90 +112,124 @@ class mnist_mlp(object):
         uninit_vars = self._session.run(tf.report_uninitialized_variables())
         if len(uninit_vars) > 0: # Note: we shouldn't need to initialize as values for all variables are fed in externally
             raise ValueError("Uninitialized variables in TensorFlow session")
-        print(uninit_vars)
+        self.logger.info("Successfully started TensorFlow session")
 
     def close(self):
+        """
+        Terminates internal TensorFlow session.
+        Performs no operation if no TensorFlow session is currently running.
+        """
         if self._session is not None:
             self._session.close()
             self._session = None
+            self.logger.info("TensorFlow session terminated")
+        else:
+            self.logger.debug("No TensorFlow session running")
 
     def _ensure_session_stated(self):
         if self._session is None:
             raise ValueError("Please start TensorFlow session by calling function 'start()'")
 
-    def compute_gradient(self, x, y, ws):
-        self._ensure_session_stated()
-        #
+    def _construct_feed_dictionary(self, x, y, ws):
         feed_dict = dict(ws)                  # copy dictionary to prevent modification of function input
         feed_dict[self._input_data] = x       # add user-specified value for input data batch
         feed_dict[self._output_labels] = y    # add user-specified value for target labels
+        return feed_dict
+
+    def evaluate(self, x, y, ws):
+        """
+        Computes for the given data set (x,y):
+        - the model's cross-entropy loss
+        - the gradients of the loss function with respect to the network's internal parameters
+
+        :param x: Test data set.
+                  Expected input: numpy matrix of dimension N x 784, where N represents the number of
+                  images in the test data set. Each row is expected to contain 784 features
+                  representing the 28*28 image pixels
+        :param y: Target labels for rows of x.
+                  Expected input: numpy matrix of dimension N x 10, where N represents the number of
+                  images in the test data set. Each row represents the image's class as one-hot encoded vector.
+        :param ws: Model parameters, i.e. neural network's weight matrices and bias vectors.
+                   A dictionary-like object is expected to have the same key-set and array-shapes as the
+                   dictionary returned mlp.generate_initial_network_parameters(). Specifically, the dictionary's
+                   keys are TensorFlow variables and the corresponding values are numpy float matrices.
+        :return: Pair (loss, gradients);
+                 loss:      the model's cross-entropy loss;
+                 gradients: dictionary containing the gradients for each of the network's internal weight matrices
+                            and bias vectors. The key-set and array-shapes are identical to the dictionary returned by
+                            function mlp.generate_initial_network_parameters().
+        """
+        self._ensure_session_stated()
+        feed_dict = self._construct_feed_dictionary(x, y, ws)
         loss, gradients_list = self._session.run([self._loss, self._param_gradients], feed_dict=feed_dict)
         return loss, dict(zip(self._param_variables, gradients_list))
 
+    def compute_accuracy(self, x, y, ws):
+        """
+        Computes the model's classification accuracy (percentage of correctly classified images).
+
+        :param x: Test data set.
+                  Expected input: numpy matrix of dimension N x 784, where N represents the number of
+                  images in the test data set. Each row is expected to contain 784 features
+                  representing the 28*28 image pixels
+        :param y: Target labels for rows of x.
+                  Expected input: numpy matrix of dimension N x 10, where N represents the number of
+                  images in the test data set. Each row represents the image's class as one-hot encoded vector.
+        :param ws: Model parameters, i.e. neural network's weight matrices and bias vectors.
+                   A dictionary-like object is expected to have the same key-set and array-shapes as the
+                   dictionary returned mlp.generate_initial_network_parameters(). Specifically, the dictionary's
+                   keys are TensorFlow variables and the corresponding values are numpy float matrices.
+        :return: classification accuracy in range [0,1]
+        """
+        self._ensure_session_stated()
+        feed_dict = self._construct_feed_dictionary(x, y, ws)
+        accuracy = self._session.run(self._accuracy, feed_dict=feed_dict) # tf.Session.run() always returns a list with results
+        return accuracy                                                # as we evaluated only one graph, the output is a list of length one
+
     def generate_initial_network_parameters(self, seed=None):
+        """
+        Generates random starting parameters for network's internal weight matrices and bias vectors.
+
+        :param seed: Optional seeding parameter for numpy random
+        :return: A dictionary containing values for each of the network's internal parameters.
+                 Specifically, the dictionary's keys are TensorFlow variables
+                 and the corresponding values are numpy float matrices.
+        """
         if seed is not None:
             np.random.seed(seed)
         return { v: np.random.normal(size=v.shape.as_list()) for v in self._params.values() }
 
     def to_clearnames(self, parameter_dictionary):
+        """
+        Non-essential function. Converts the key-set of the parameter_dictionary
+        to human-readable strings. This is useful for saving the training results.
+
+        :param parameter_dictionary:
+               A dictionary containing numpy matrices for each of the network's internal TensorFlow placeholders.
+               Specifically, the dictionary's keys are TensorFlow variables
+               and the corresponding values are numpy float matrices.
+        :return: A dictionary with the same values as input parameter_dictionary
+                 but with keys replaced by human-readable strings.
+        """
         var_to_clearname_dic = { v:k for k,v in self._params.items() }
         var_to_clearname_dic[self._input_data] = 'input data batch'
         var_to_clearname_dic[self._output_labels] = 'target label batch'
         return { var_to_clearname_dic[k] : v for k, v in parameter_dictionary.items() }
 
     def to_intervars(self, parameter_dictionary):
+        """
+        Non-essential function. Converts the key-set of the parameter_dictionary
+        from human-readable strings to network's internal TensorFlow placeholders.
+        This is useful when loading parameter matrices into the model
+        from previously saved files. The dictionary returned by this function an be
+        directly used as `ws` when calling mlp.evaluate() or mlp.compute_accuracy()
+
+        :param parameter_dictionary:
+               A dictionary containing numpy matrices for each of the network's weight matrices
+               and bias vectors. The keys must correspond to the human-readable string generated
+               by function mlp.to_clearnames().
+        :return: A dictionary with the same values as input parameter_dictionary
+                 but with keys replaced by internal TensorFlow placeholders.
+        """
         return {self._params[k] :parameter_dictionary[k]  for k in self._param_keys}
-
-
-# ============================= Main for testing ==============================
-
-
-def save_dataset(values, target_file):
-    values = {key.replace(' ', '_') : var for key, var in values.items()}
-    target_dir = os.path.abspath(os.path.join(target_file, os.pardir))
-    if not os.path.exists(target_dir):
-        print("creating folder")
-        os.makedirs(target_dir)
-    target_file = os.path.abspath(target_file)
-    print("writing file '%s'" % target_file)
-    np.savez_compressed(target_file, **values)
-
-if __name__ == "__main__":
-    llevel = logging.DEBUG
-    logging.basicConfig(stream=sys.stdout, level=llevel)
-    logger = logging.getLogger("protoype")
-    logger.setLevel(llevel)
-
-
-llevel = logging.DEBUG
-logging.basicConfig(stream=sys.stdout, level=llevel)
-logger = logging.getLogger("protoype")
-logger.setLevel(llevel)
-
-T = mnist_mlp()
-params = T.generate_initial_network_parameters(seed=1234)
-ipc = T.to_clearnames(params)
-
-# save starting parameters
-working_dir = "/Users/alex/Temp/MNIST"
-param_dir = "params"
-iteration = 0
-file_name = "params_%04d.npz" % iteration
-
-target_file = os.path.abspath(os.path.join(working_dir, param_dir, "params_%04d.npz" % iteration))
-save_dataset(ipc, target_file)
-
-
-learning_rate = 0.5
-T.start()
-for iteration in np.arange(5):
-    data = np.load(os.path.join(os.path.join(working_dir, "batches"), "data_batch_%04d.npz" % iteration))
-    l, grad = T.compute_gradient(data['batch_x'], data['batch_y'], params)
-    for k in params.keys():
-        params[k] -= learning_rate * grad[k]
-    print("loss %.09f" % l)
-    target_file = os.path.abspath(os.path.join(working_dir, param_dir, "params_%04d.npz" % (iteration+1)))
-    save_dataset(T.to_clearnames(params), target_file)
-
-T.close()
 

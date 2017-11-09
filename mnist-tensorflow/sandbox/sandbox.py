@@ -137,6 +137,16 @@ def save_nn_params(tf_sess, id, weight_vars, bias_vars, working_dir):
     save_dataset(tf_sess, bias_vars, working_dir, "biases_" + str(id) + ".npz")
 
 
+def save_dataset2(values, target_file):
+    values = {key.replace(' ', '_') : var for key, var in values.items()}
+    target_dir = os.path.abspath(os.path.join(target_file, os.pardir))
+    if not os.path.exists(target_dir):
+        print("creating folder")
+        os.makedirs(target_dir)
+    target_file = os.path.abspath(target_file)
+    print("writing file '%s'" % target_file)
+    np.savez_compressed(target_file, **values)
+
 # Self-contained session
 # =======================================================================================
 temp_dir = "temp2"
