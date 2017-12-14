@@ -34,7 +34,7 @@ def import_data(working_dir, data_dir):
 # =========================================================================== #
 
 working_dir = "/Users/alex/Temp/MNIST"
-batch_size = 100
+batch_size = 1
 training_epochs = 20
 learning_rate = 0.5
 
