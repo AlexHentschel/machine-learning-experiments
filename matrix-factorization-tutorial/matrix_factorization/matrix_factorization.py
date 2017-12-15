@@ -145,11 +145,11 @@ full_data = synthetic_data_generator(number_users, number_items, number_hidden_c
 # shuffle data and randomly select
 full_data_shuffled = full_data.sample(frac=1)
 
-# In total, there are 100,000 possible observations. we will use 5% for training
-# and track the model's performance on the remaining 95%.
+# In total, there are 100,000 possible observations. we will use 10% for training
+# and track the model's performance on the remaining 10%.
 # NOTE: generally, we don't have access to the full possible data set. We also
 #       don't use it for training here. Only to show that the model actually learns
-#       generate good predictions using only 5% of theoretical full data set.
+#       generate good predictions using only 10% of theoretical full data set.
 training_data = full_data_shuffled.iloc[:10000]
 test_data = full_data_shuffled.iloc[10000:]
 
