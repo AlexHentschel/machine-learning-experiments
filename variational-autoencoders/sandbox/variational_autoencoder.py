@@ -26,7 +26,7 @@ from keras.datasets import mnist
 
 def init_logger(llevel=logging.DEBUG):
     logging.basicConfig(stream=sys.stdout, level=llevel)
-    logger = logging.getLogger("mlp_usage_example")
+    logger = logging.getLogger("variational_autoencoder")
     logger.setLevel(llevel)
     return logger
 
@@ -118,12 +118,29 @@ vae = Model(inputs=[x, eps], outputs=decoder(z))
 
 # Train VAE
 # =======================================================================================
+# for callbacks see: https://keunwoochoi.wordpress.com/2016/07/16/keras-callbacks/
 class HistoryEncodings(Callback):
+    def _save_batch(self):
+        logger.debug("\nSaving batch %d", self.batch_count)
+        self.encodings[self.batch_count] = encoder.predict(x_test)
+
     def on_train_begin(self, logs={}):
+        self.batch_count = 0
+        self.batch_separator = 1
+        self.remaining_batches_to_skip = 1
         self.encodings = {}
 
-    def on_epoch_begin(self, epoch, logs={}):
-        self.encodings[epoch] = encoder.predict(x_test)
+    def on_batch_begin(self, batch, logs={}):
+        if self.batch_count < 100:
+            self._save_batch()
+        else:
+            if self.remaining_batches_to_skip < 1:
+                self._save_batch()
+                self.remaining_batches_to_skip = self.batch_separator
+                self.batch_separator += 1
+            else:
+                self.remaining_batches_to_skip -= 1
+        self.batch_count += 1
         return
 
 
@@ -146,7 +163,7 @@ hist = vae.fit(x_train,
 
 # Encodings of digits in dimension-reduced representation
 # .......................................................................................
-def plot_encodings(zs, box_subdomain=None, image_destination=None, close_image=False):
+def plot_encodings(zs, box_subdomain=None, image_destination=None, close_image=False, plot_limits=10):
     """
     display a 2D plot of the digit classes in the latent space
     :param zs:
@@ -168,10 +185,10 @@ def plot_encodings(zs, box_subdomain=None, image_destination=None, close_image=F
         plt.plot([-box_subdomain, box_subdomain], [-box_subdomain, -box_subdomain], color='black', linestyle=':', linewidth=1)
         plt.plot([box_subdomain, box_subdomain], [-box_subdomain, box_subdomain], color='black', linestyle=':', linewidth=1)
         plt.plot([-box_subdomain, -box_subdomain], [-box_subdomain, box_subdomain], color='black', linestyle=':', linewidth=1)
-    plt.xlabel('$z_1$')
-    plt.ylabel('$z_2$')
-    plt.xlim([-4, 4])
-    plt.ylim([-4, 4])
+    plt.xlabel('Latent Variable $\mu_1$', fontsize=18)
+    plt.ylabel('Latent Variable $\mu_2$', fontsize=18)
+    plt.xlim([-plot_limits, plot_limits])
+    plt.ylim([-plot_limits, plot_limits])
     plt.draw()
     plt.show()
     if image_destination is not None:
@@ -185,23 +202,21 @@ def plot_encodings(zs, box_subdomain=None, image_destination=None, close_image=F
         plt.close(f)
 
 figure_dir = "/Users/alex/Temp/VAE-Training-Figures/"
-figure_name_template = "encoding_epoch%0" + str(len(str(epochs)))+ "d.png"
+figure_name_template = "encoding_batch%0" + str(len(str(encoding_history.batch_count)))+ "d.png"
 
-for epoch, z_test in encoding_history.encodings.items():
-    dest = os.path.join(figure_dir, figure_name_template % epoch)
+for b, z_test in encoding_history.encodings.items():
+    dest = os.path.join(figure_dir, figure_name_template % b)
     plot_encodings(z_test, image_destination=dest, close_image=True)
 
+quantile_norm = 3.0902323061678132
 z_test = encoder.predict(x_test)
-dest = os.path.join(figure_dir, figure_name_template % epochs)
+dest = os.path.join(figure_dir, figure_name_template % encoding_history.batch_count)
 plot_encodings(z_test, image_destination=dest, close_image=False)
+dest = os.path.join(figure_dir, "zoomed_" + figure_name_template % encoding_history.batch_count)
+plot_encodings(z_test, image_destination=dest, close_image=False, plot_limits=quantile_norm)
 
-quantile_norm = 2.32634787
-dest = os.path.join(figure_dir, "boxed_" + figure_name_template % epochs)
-plot_encodings(z_test, box_subdomain=quantile_norm, image_destination=dest, close_image=True)
-
-
-
-
+dest = os.path.join(figure_dir, "boxed_" + figure_name_template % encoding_history.batch_count)
+plot_encodings(z_test, box_subdomain=quantile_norm, image_destination=dest, close_image=False)
 
 # Reconstructed image from dimension-reduced representation
 #  - plot reconstructions for a grid of values
@@ -218,8 +233,8 @@ figure_data_grid = np.zeros((digit_size * n, digit_size * n))
 # through the inverse CDF (ppf) of the Gaussian to produce values
 # of the latent variables z, since the prior of the latent space
 # is Gaussian
-quantile_min = 0.01
-quantile_max = 0.99
+quantile_min = 0.001
+quantile_max = 0.999
 z1 = norm.ppf(np.linspace(quantile_min, quantile_max, n))
 z2 = norm.ppf(np.linspace(quantile_max, quantile_min, n))
 
@@ -239,9 +254,10 @@ ax.set_xticklabels(map('{:.2f}'.format, z1), rotation=90)
 ax.set_yticks(np.arange(0, n*digit_size, digit_size) + .5 * digit_size)
 ax.set_yticklabels(map('{:.2f}'.format, z2))
 
-ax.set_xlabel('$z_1$')
-ax.set_ylabel('$z_2$')
-
+plt.xlabel('Latent Variable $\mu_1$', fontsize=18)
+plt.ylabel('Latent Variable $\mu_2$', fontsize=18)
 plt.show()
 
-
+figure_dir = "/Users/alex/Temp/VAE-Training-Figures/"
+figure_name = "reconstruction.png"
+plt.savefig(os.path.join(figure_dir, figure_name), dpi=100)
