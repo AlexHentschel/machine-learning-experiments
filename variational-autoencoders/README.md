@@ -78,5 +78,5 @@ $> pip install keras
 
 
 **Notes:**
-- By default, Keras will use TensorFlow as its backend. Switching the backend to CNTK or Theano
+- By default, Keras will use TensorFlow as its backend. TensorFlow is also the backend I use here (for no particular reason than convenience). Switching the backend to CNTK or Theano
 is documented [here](https://keras.io/backend/).

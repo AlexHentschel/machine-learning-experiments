@@ -9,7 +9,7 @@ with open('requirements.txt', encoding='utf-8') as f:
     requirements = [line.strip() for line in f]
 
 setup(
-    name='mnist_tensorflow',
+    name='variational-autoencoders',
     version='0.0.1',
 
     description='Tensorflow Neural Network for solving MNIST',
@@ -19,5 +19,5 @@ setup(
     author=['Alexander Hentschel'],
     author_email=['alex.hentschel@axiomzen.co'],
 
-    packages=['neural_network_model'],
+    packages=['variational_autoencoders'],
 )
