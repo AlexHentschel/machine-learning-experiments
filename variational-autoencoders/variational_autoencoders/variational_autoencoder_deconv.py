@@ -1,27 +1,34 @@
-'''This script demonstrates how to build a variational autoencoder with Keras and deconvolution layers.
-# from
+'''
+This script demonstrates how to build a variational autoencoder with Keras and deconvolution layers.
+
+# Origin
+This Code is HEAVILY based on Keras' example
 https://github.com/keras-team/keras/blob/master/examples/variational_autoencoder_deconv.py
 
-# License
-This is covered by the MIT License, hence might be
+which is covered by the MIT License:
 https://github.com/keras-team/keras/blob/master/LICENSE
-
 
 # Reference
 - Auto-Encoding Variational Bayes
   https://arxiv.org/abs/1312.6114
+
+Modifications:
+    Alexander Hentschel
+    alex.hentschel@axiomzen.co
+
 '''
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 
-from keras.layers import Input, Dense, Lambda, Flatten, Reshape
+from keras.layers import Layer, Input, Dense, Lambda, Flatten, Reshape
 from keras.layers import Conv2D, Conv2DTranspose
 from keras.models import Model
 from keras import backend as K
-from keras import metrics
 from keras.datasets import mnist
+# from keras import metrics
+# from keras import losses
 
 # ########################################################################### #
 # Losses
@@ -29,9 +36,18 @@ from keras.datasets import mnist
 
 def nll(y_true, y_pred):
     """ Negative log likelihood (Bernoulli). """
-    # keras.losses.binary_crossentropy gives the mean
-    # over the last axis. we require the sum
-    return K.sum(K.binary_crossentropy(y_true, y_pred), axis=-1)
+    # using directly the binary_crossentropy implementation from the TensorFlow backend
+    _loss = K.binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
+    # CAUTION:
+    # both
+    #  - keras.losses.binary_crossentropy
+    #  - keras.metrics.binary_crossentropy
+    # return the MEAN over the last axis. We require the sum.
+    # Hence, using either requires the additional inclusion of the scaling factor
+    #    imgage_rows * imgage_cols
+    # E.g for MNIST:
+    #    _loss =  img_rows * img_cols * metrics.binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
+    return K.sum(_loss, axis=-1)
 
 
 class KLDivergenceLayer(Layer):
@@ -45,14 +61,14 @@ class KLDivergenceLayer(Layer):
 
     def call(self, inputs):
         mu, log_var = inputs
-        kl_batch = - .5 * K.sum(1 + log_var -
-                                K.square(mu) -
-                                K.exp(log_var), axis=-1)
+        kl_batch = - .5 * K.sum(1 + log_var - K.square(mu) - K.exp(log_var), axis=-1)
         self.add_loss(K.mean(kl_batch), inputs=inputs)
         return inputs
 
-
-
+# ########################################################################### #
+# Specify VAE Model
+# for MNIST benchmark (28x28 gray-scale pictures)
+# =========================================================================== #
 
 # input image dimensions
 img_rows, img_cols, img_chns = 28, 28, 1
@@ -92,8 +108,11 @@ hidden = Dense(intermediate_dim, activation='relu')(flat)
 
 z_mean = Dense(latent_dim)(hidden)
 z_log_var = Dense(latent_dim)(hidden)
+z_mean, z_log_var = KLDivergenceLayer()([z_mean, z_log_var])
 
 
+# Stochastic sampling branch for generating random inputs for decoder
+# .......................................................................................
 def sampling(args):
     z_mean, z_log_var = args
     epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
@@ -149,15 +168,7 @@ x_decoded_mean_squash = decoder_mean_squash(x_decoded_relu)
 # instantiate VAE model
 vae = Model(x, x_decoded_mean_squash)
 
-# Compute VAE loss
-xent_loss = img_rows * img_cols * metrics.binary_crossentropy(
-    K.flatten(x),
-    K.flatten(x_decoded_mean_squash))
-kl_loss = - 0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
-vae_loss = K.mean(xent_loss + kl_loss)
-vae.add_loss(vae_loss)
-
-vae.compile(optimizer='rmsprop', loss=None)
+vae.compile(optimizer='rmsprop', loss=nll)
 vae.summary()
 
 # train the VAE on MNIST digits
@@ -171,10 +182,11 @@ x_test = x_test.reshape((x_test.shape[0],) + original_img_size)
 print('x_train.shape:', x_train.shape)
 
 vae.fit(x_train,
+        x_train,
         shuffle=True,
         epochs=epochs,
         batch_size=batch_size,
-        validation_data=(x_test, None))
+        validation_data=(x_test, x_test))
 
 # build a model to project inputs on the latent space
 encoder = Model(x, z_mean)
