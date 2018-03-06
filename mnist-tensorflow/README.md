@@ -5,7 +5,6 @@ high school students and employees of the United States Census Bureau.
 
 Useful References:
 - Data and further details about the data is on [Yann LeCun's website](http://yann.lecun.com/exdb/mnist/)
-- 
 [TensorFlow tutorial for MNIST](https://www.tensorflow.org/get_started/mnist/beginners)
 
 ## Usage

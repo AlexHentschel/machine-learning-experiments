@@ -1,6 +1,6 @@
 # Tensor-Factorization based on Tensorflow for collaborative filtering
 
-Implements efficient tensor-factorization for news article recommendation. 
+Tutorial implementation of tensor-factorization in TensorFlow. 
 The implementation is inspired by the algorithm described in Albert Au Yeung
 's [blogg post](http://www.quuxlabs.com/blog/2010/09/matrix-factorization-a-simple-tutorial-and-implementation-in-python/).
 However, the implementation deviates in several aspects:
