@@ -87,10 +87,12 @@ def squash(vectors, axis=-1):
 
 class CapsuleLayer(layers.Layer):
     """
-    The capsule layer. It is similar to Dense layer. Dense layer has `in_num` inputs, each is a scalar, the output of the 
+    The capsule layer. It is similar to Dense layer. Dense layer has `in_num` inputs, each is a scalar output of the
     neuron from the former layer, and it has `out_num` output neurons. CapsuleLayer just expand the output of the neuron
-    from scalar to vector. So its input shape = [None, input_num_capsule, input_dim_capsule] and output shape = \
-    [None, num_capsule, dim_capsule]. For Dense Layer, input_dim_capsule = dim_capsule = 1.
+    from scalar to vector:
+        input shape = [None, input_num_capsule, input_dim_capsule] and
+       output shape = [None, num_capsule, dim_capsule].
+    For Dense Layer, input_dim_capsule = dim_capsule = 1.
     
     :param num_capsule: number of capsules in this layer
     :param dim_capsule: dimension of the output vectors of the capsules in this layer
@@ -198,7 +200,7 @@ def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
     #         _r(output).get_shape()
     # return [None, None, 8] (why ?)
     #
-    # Maybe computing the dimensions explicitly might be better.
+    # Maybe computing the dimensions explicitly might be better:
     _number_capsules = np.prod(output.get_shape().as_list()[1:-1]) * n_channels
     outputs = layers.Reshape(target_shape=[_number_capsules, dim_capsule], name='primarycap_reshape')(output)
     return layers.Lambda(squash, name='primarycap_squash')(outputs)

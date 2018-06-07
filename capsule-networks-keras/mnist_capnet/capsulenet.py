@@ -316,3 +316,32 @@ else:  # as long as weights are given, will run testing
         print('No weights are provided. Will test using random initialized weights.')
     manipulate_latent(manipulate_model, (x_test, y_test), args)
     test(model=eval_model, data=(x_test, y_test), args=args)
+
+##################################################################################
+# Compute `inputs * W` by scanning inputs_tiled on dimension 0.
+# x.shape=[num_capsule, input_num_capsule, input_dim_capsule]
+# W.shape=[num_capsule, input_num_capsule, dim_capsule, input_dim_capsule]
+# Regard the first two dimensions as `batch` dimension,
+# then matmul: [input_dim_capsule] x [dim_capsule, input_dim_capsule]^T -> [dim_capsule].
+# inputs_hat.shape = [None, num_capsule, input_num_capsule, dim_capsule]
+
+
+input = layers.Input(shape=[1152,8])
+input_expanded = K.expand_dims(K.expand_dims(input, axis=2), axis=1)
+print(input_expanded.shape.as_list())
+
+w = K.ones(shape=(1, 10, 1152, 16, 8))
+print(w.shape.as_list())
+
+u_hat = K.sum(w * input_expanded, axis=-1)
+print(u_hat.shape.as_list())
+
+
+
+
+x = K.ones(shape=(32, 40, 817, 1, 6, 20))
+t = K.batch_dot(x, w, axes=[4,4])
+print(t.shape)
+
+inputs_hat = K.map_fn(lambda x:, elems=inputs_tiled)
+
