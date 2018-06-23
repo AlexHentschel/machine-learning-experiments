@@ -121,13 +121,11 @@ class CapsuleLayer(layers.Layer):
         self.built = True
 
     def call(self, inputs, training=None):
-        # inputs.shape=[None, input_num_capsule, input_dim_capsule]
-        # inputs_expand.shape=[None, 1, input_num_capsule, input_dim_capsule]
-        inputs_expand = K.expand_dims(inputs, 1)
+        # inputs.shape=[None, 1, input_num_capsule, input_dim_capsule]
 
         # Replicate num_capsule dimension to prepare being multiplied by W
         # inputs_tiled.shape=[None, num_capsule, input_num_capsule, input_dim_capsule]
-        inputs_tiled = K.tile(inputs_expand, [1, self.num_capsule, 1, 1])
+        inputs_tiled = K.tile(inputs, [1, self.num_capsule, 1, 1])
 
         # Compute `inputs * W` by scanning inputs_tiled on dimension 0.
         # x.shape=[num_capsule, input_num_capsule, input_dim_capsule]
@@ -184,7 +182,13 @@ def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
     :param inputs: 4D tensor, shape=[None, width, height, channels]
     :param dim_capsule: the dim of the output vector of capsule
     :param n_channels: the number of types of capsules
-    :return: output tensor, shape=[None, num_capsule, dim_capsule]
+    :return: tensor with shape
+             [None, 1, num_capsule, dim_capsule]
+             containing
+              * index of input in batch
+              * auxiliary unit dimension (to streamline subsequent operations)
+              * primary capsule index
+              * capsule output-vector
     """
     output = layers.Conv2D(filters=dim_capsule*n_channels, kernel_size=kernel_size, strides=strides, padding=padding,
                            name='primarycap_conv2d')(inputs)
@@ -202,18 +206,7 @@ def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
     #
     # Maybe computing the dimensions explicitly might be better:
     _number_capsules = np.prod(output.get_shape().as_list()[1:-1]) * n_channels
-    outputs = layers.Reshape(target_shape=[_number_capsules, dim_capsule], name='primarycap_reshape')(output)
+    outputs = layers.Reshape(target_shape=[1, _number_capsules, dim_capsule], name='primarycap_reshape')(output)
     return layers.Lambda(squash, name='primarycap_squash')(outputs)
 
 
-"""
-# The following is another way to implement primary capsule layer. This is much slower.
-# Apply Conv2D `n_channels` times and concatenate all capsules
-def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
-    outputs = []
-    for _ in range(n_channels):
-        output = layers.Conv2D(filters=dim_capsule, kernel_size=kernel_size, strides=strides, padding=padding)(inputs)
-        outputs.append(layers.Reshape([output.get_shape().as_list()[1] ** 2, dim_capsule])(output))
-    outputs = layers.Concatenate(axis=1)(outputs)
-    return layers.Lambda(squash)(outputs)
-"""

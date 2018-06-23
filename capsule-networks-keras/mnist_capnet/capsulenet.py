@@ -133,7 +133,8 @@ def train(model, data, args):
 
     # Training with data augmentation. If shift_fraction=0., also no augmentation.
     model.fit_generator(generator=train_generator(x_train, y_train, args.batch_size, args.shift_fraction),
-                        steps_per_epoch=int(y_train.shape[0] / args.batch_size),
+                        # steps_per_epoch=int(y_train.shape[0] / args.batch_size),
+                        steps_per_epoch=int(10),
                         epochs=args.epochs,
                         validation_data=[[x_test, y_test], [y_test, x_test]],
                         callbacks=[log, tb, checkpoint, lr_decay])
@@ -338,10 +339,59 @@ print(u_hat.shape.as_list())
 
 
 
-
-x = K.ones(shape=(32, 40, 817, 1, 6, 20))
+x = K.ones(shape=(1000, 1, 1152,1, 8))
+w = K.ones(shape=(1,   10, 1152,16,8))
 t = K.batch_dot(x, w, axes=[4,4])
-print(t.shape)
+# print(t.shape)
+#
+import tensorflow as tf
+print(tf.matmul(w, x, transpose_b=True).shape)
+
+
+import tensorflow as tf
+x = layers.Input(shape=(1, 1152,1, 8))
+w = layers.Input(shape=(10, 1152,16,8))
+
+x_rs = layers.Reshape(target_shape=(np.prod(x.shape.as_list()[1:-1]), x.shape.as_list()[-1]))(x)
+w_rs = layers.Reshape(target_shape=(np.prod(w.shape.as_list()[1:-1]), w.shape.as_list()[-1]))(w)
+
+print("x_rs.shape: " + str(x_rs.shape.as_list()))
+print("w_rs.shape: " + str(w_rs.shape.as_list()))
+
+_t = layers.Dot(axes=2)([x_rs, w_rs])
+print("_t.shape: " + str(_t.shape.as_list()))
+M = models.Model(inputs=[x,w], outputs=[_t])
+
+
+_t = tf.matmul(x_rs, w_rs, transpose_b=True)
+_tl = layers.Lambda(lambda x: 1*x)(_t)
+M = models.Model(inputs=[x,w], outputs=[_tl])
+
+
+
+x_values = np.random.rand(*x.shape.as_list())
+w_values = np.random.rand(*w.shape.as_list())
+M.predict([], batch_size=100)
+
+
+
+
+
+K.reshape(w, target_shape=(-1, 8))().shape
+
+layers.Reshape
+
+
+
+
+
+x = K.ones(shape=(1000, 1, 1152,1, 8))
+w = K.ones(shape=(1,   10, 1152,16,8))
+
+
+W = K.random_normal([100, 50], stddev=0.1)
+models.Model(inputs=[], outputs=[w])
+
 
 inputs_hat = K.map_fn(lambda x:, elems=inputs_tiled)
 
