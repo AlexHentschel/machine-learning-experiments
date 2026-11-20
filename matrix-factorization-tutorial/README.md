@@ -1,3 +1,9 @@
+<p align="center">
+<img src="https://github.com/user-attachments/assets/f7c9b125-fe71-4b6e-b63c-50e6583218bc" height="300" />
+</p>
+
+
+
 # Tensor-Factorization based on Tensorflow for collaborative filtering
 
 Tutorial implementation of tensor-factorization in TensorFlow. 
